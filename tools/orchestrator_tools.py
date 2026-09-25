@@ -1,3 +1,9 @@
+"""
+tools/orchestrator_tools.py
+====================
+
+Tools directly available for Orchestrator to interact with user directly and deploy agents in parallel.
+"""
 
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
