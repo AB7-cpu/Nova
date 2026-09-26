@@ -1,0 +1,387 @@
+/* ─── Design tokens ─────────────────────────────────────────────────────── */
+:root {
+    --bg:              #07090f;
+    --card-bg:         rgba(255, 255, 255, 0.032);
+    --card-border:     rgba(255, 255, 255, 0.07);
+    --text:            #e2e8f0;
+    --text-muted:      #475569;
+
+    /* State colours */
+    --col-sleeping:   #1e293b;
+    --col-listening:  #3b82f6;
+    --col-thinking:   #a855f7;
+    --col-speaking:   #22c55e;
+    --col-wakeword:   #f59e0b;
+
+    --glow-listening: rgba(59,  130, 246, 0.25);
+    --glow-thinking:  rgba(168,  85, 247, 0.25);
+    --glow-speaking:  rgba(34,  197,  94, 0.25);
+    --glow-wakeword:  rgba(245, 158,  11, 0.25);
+}
+
+/* ─── Reset & base ───────────────────────────────────────────────────────── */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    background: var(--bg);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Inter', sans-serif;
+    color: var(--text);
+    overflow: hidden;
+}
+
+/* Subtle background grid */
+.bg-grid {
+    position: fixed;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events: none;
+}
+
+/* ─── Card ───────────────────────────────────────────────────────────────── */
+.container {
+    width: 100%;
+    max-width: 400px;
+    padding: 24px;
+    position: relative;
+    z-index: 1;
+}
+
+.card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 28px;
+    padding: 36px 32px 32px;
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 28px;
+    box-shadow:
+        0 0 0 1px rgba(255,255,255,0.04) inset,
+        0 32px 80px rgba(0,0,0,0.6);
+}
+
+/* ─── Header ─────────────────────────────────────────────────────────────── */
+.header {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.4px;
+}
+
+.logo-dot {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: var(--col-sleeping);
+    transition: background 0.5s ease, box-shadow 0.5s ease;
+}
+
+/* Connection status */
+.connection-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--card-border);
+    cursor: default;
+}
+
+.conn-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    transition: background 0.4s ease;
+}
+
+.connection-indicator.connected .conn-dot {
+    background: var(--col-speaking);
+    box-shadow: 0 0 6px var(--col-speaking);
+}
+
+/* ─── Waveform ───────────────────────────────────────────────────────────── */
+.waveform-wrapper {
+    position: relative;
+    width: 100%;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Glow bloom behind bars */
+.waveform-glow {
+    position: absolute;
+    width: 70%;
+    height: 60px;
+    border-radius: 50%;
+    filter: blur(28px);
+    opacity: 0;
+    transition: opacity 0.6s ease, background 0.5s ease;
+    pointer-events: none;
+}
+
+.bars {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    height: 60px;
+    position: relative;
+    z-index: 1;
+}
+
+/* Individual bar */
+.bar {
+    width: 3px;
+    border-radius: 8px;
+    background: var(--col-sleeping);
+    transform: scaleY(0.08);
+    transform-origin: center;
+    transition: background 0.5s ease;
+    /* animation applied via JS custom props */
+}
+
+/* ─── Animated states ────────────────────────────────────────────────────── */
+
+/* LISTENING — blue */
+.bars.listening .bar {
+    background: var(--col-listening);
+    animation: wave var(--dur) ease-in-out var(--delay) infinite;
+}
+.waveform-glow.listening {
+    background: var(--col-listening);
+    opacity: 0.18;
+}
+
+/* THINKING — purple */
+.bars.thinking .bar {
+    background: var(--col-thinking);
+    animation: wave var(--dur) ease-in-out var(--delay) infinite;
+    opacity: 0.75;
+}
+.waveform-glow.thinking {
+    background: var(--col-thinking);
+    opacity: 0.15;
+}
+
+/* SPEAKING — green */
+.bars.speaking .bar {
+    background: var(--col-speaking);
+    animation: wave var(--dur) ease-in-out var(--delay) infinite;
+}
+.waveform-glow.speaking {
+    background: var(--col-speaking);
+    opacity: 0.18;
+}
+
+/* WAKEWORD — amber flash */
+.bars.wakeword .bar {
+    background: var(--col-wakeword);
+    animation: wave 0.35s ease-in-out var(--delay) infinite;
+}
+.waveform-glow.wakeword {
+    background: var(--col-wakeword);
+    opacity: 0.2;
+}
+
+@keyframes wave {
+    0%, 100% { transform: scaleY(0.08); }
+    50%       { transform: scaleY(1); }
+}
+
+/* ─── Status pill ────────────────────────────────────────────────────────── */
+.status-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 22px;
+    border-radius: 100px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--card-border);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted);
+    transition: color 0.5s ease, border-color 0.5s ease, box-shadow 0.5s ease;
+    letter-spacing: 0.2px;
+}
+
+.status-icon { font-size: 15px; }
+
+.status-pill.listening { color: var(--col-listening); border-color: rgba(59,130,246,0.3); box-shadow: 0 0 24px var(--glow-listening); }
+.status-pill.thinking  { color: var(--col-thinking);  border-color: rgba(168,85,247,0.3);  box-shadow: 0 0 24px var(--glow-thinking);  }
+.status-pill.speaking  { color: var(--col-speaking);  border-color: rgba(34,197,94,0.3);   box-shadow: 0 0 24px var(--glow-speaking);  }
+.status-pill.wakeword  { color: var(--col-wakeword);  border-color: rgba(245,158,11,0.3);  box-shadow: 0 0 24px var(--glow-wakeword);  }
+
+/* ─── Control button ─────────────────────────────────────────────────────── */
+.control-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 40px;
+    border-radius: 14px;
+    border: 1px solid var(--card-border);
+    background: rgba(255,255,255,0.05);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    letter-spacing: 0.3px;
+    transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+    user-select: none;
+}
+
+.control-btn:hover {
+    background: rgba(255,255,255,0.09);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.control-btn:active { transform: translateY(0); }
+
+/* Stop state */
+.control-btn.running {
+    background: rgba(239, 68, 68, 0.08);
+    border-color: rgba(239, 68, 68, 0.25);
+    color: #ef4444;
+}
+
+.control-btn.running:hover {
+    background: rgba(239, 68, 68, 0.15);
+}
+
+/* ─── Mode Selector ──────────────────────────────────────────────────────── */
+.mode-control {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--card-border);
+    border-radius: 18px;
+    padding: 12px 14px;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.mode-control:hover {
+    border-color: rgba(255, 255, 255, 0.12);
+}
+
+.mode-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 4px;
+}
+
+.mode-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--text-muted);
+}
+
+.mode-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 20px;
+    background: rgba(59, 130, 246, 0.12);
+    color: #60a5fa;
+    border: 1px solid rgba(59, 130, 246, 0.25);
+    transition: all 0.3s ease;
+}
+
+.mode-badge.offline {
+    background: rgba(168, 85, 247, 0.12);
+    color: #c084fc;
+    border-color: rgba(168, 85, 247, 0.25);
+}
+
+.select-container {
+    position: relative;
+    width: 100%;
+    display: flex;
+    align-items: center;
+}
+
+.mode-dropdown {
+    width: 100%;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 9px 34px 9px 12px;
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.25s ease, background 0.25s ease, box-shadow 0.25s ease;
+}
+
+.mode-dropdown:hover {
+    background: rgba(255, 255, 255, 0.07);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.mode-dropdown:focus {
+    border-color: rgba(59, 130, 246, 0.4);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+.mode-dropdown option {
+    background: #0d1117;
+    color: #e2e8f0;
+    padding: 8px 12px;
+}
+
+.dropdown-chevron {
+    position: absolute;
+    right: 12px;
+    pointer-events: none;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.25s ease, color 0.25s ease;
+}
+
+.mode-dropdown:focus + .dropdown-chevron {
+    color: var(--col-listening);
+    transform: rotate(180deg);
+}
+
+.mode-hint {
+    font-size: 11px;
+    color: #64748b;
+    padding: 0 4px;
+    line-height: 1.3;
+    transition: color 0.3s ease;
+}
