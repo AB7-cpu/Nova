@@ -1,5 +1,79 @@
-__pycache__
-venv
-VibeVoice
-.text_to_speech
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+**/.venv/
+**/venv/
+
+# Environment Variables & Secrets
 .env
+.env.*
+!.env.example
+tests/.env
+
+# Large Binaries & Executables (mpv.exe is ~117MB; exceeds GitHub 100MB limit)
+mpv.exe
+*.exe
+*.dll
+
+# SQLite & Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# IDE / Editor folders
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# Root level test screenshots
+/*.png
+!docs/*.png
+
+# Speech synthesis & external repos
+VibeVoice/
+.text_to_speech/
+
+# Internal Developer Planning Notes
+Redevelopment Planning till now.md
