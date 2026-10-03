@@ -2,10 +2,10 @@
 llm/router.py — LLM Router with Online → Offline Fallback
 ==========================================================
 
-Provides dynamic routing between Online (Groq) and Offline (Ollama):
+Provides dynamic routing between Online (Groq, OpenRouter) and Offline (Ollama):
   - "offline": Forces orchestrator and subagents to use local Ollama model directly.
-  - "hybrid":  Tries online Groq first with a timeout,
-               falling back to local Ollama if Groq fails or times out.
+  - "hybrid":  Tries online Groq or OpenRouter first with a timeout,
+               falling back to local Ollama if (Groq, Openrouter) fails or times out.
 """
 
 import asyncio
@@ -24,7 +24,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import ROUTER, ONLINE_LLM_PROVIDER
-from llm.online_llm import get_groq, get_gemini
+from llm.online_llm import get_groq, get_gemini, get_openrouter
 from llm.ollama_llm import get_ollama
 
 logger = logging.getLogger(__name__)
@@ -61,6 +61,8 @@ def set_mode(mode: str) -> str:
 def _get_online_llm(temperature: float = 0.7) -> BaseChatModel:
     if ONLINE_LLM_PROVIDER == "gemini":
         return get_gemini(temperature=temperature)
+    elif ONLINE_LLM_PROVIDER == 'openrouter':
+        return get_openrouter(temperature=temperature)
     return get_groq(temperature=temperature)
 
 
