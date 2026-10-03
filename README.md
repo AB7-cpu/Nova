@@ -105,8 +105,8 @@ Translates plain-English operating system directives into Windows PowerShell cmd
 │   └── media_tools.py            # yt-dlp audio stream extraction helpers
 │
 ├── docs/                         # Architecture Documentation & Visual Assets
-│   ├── NOVA_ARCHITECTURE.md      # In-depth architectural design specifications
-│   ├── pipeline_diagram.md       # ASCII latency and pipeline diagrams
+│   ├── Architecture Diagram.png      # Architecture Diagram
+│   ├── Router Pipeline.png       # Router pipeline diagram image
 │   └── System Architecture.png   # Architecture schematic diagram
 │
 ├── config.py                     # Central configuration & environment source of truth
