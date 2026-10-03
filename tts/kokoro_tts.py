@@ -6,6 +6,7 @@ from pydub.playback import play
 
 import os
 import sys
+import re
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import TTS
@@ -24,6 +25,8 @@ def fetch_audio(text: str) -> bytes | None:
     """
     if not text.strip():
         return None
+
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
 
     payload = {
         "profile_id":       PROFILE_ID,
