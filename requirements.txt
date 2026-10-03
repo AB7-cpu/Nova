@@ -1,0 +1,39 @@
+# ==============================================================================
+# MyCroft Voice Assistant — Project Dependencies
+# ==============================================================================
+
+# --- Core Web Server & API ---
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+websockets>=13.0
+pydantic>=2.8.0
+python-dotenv>=1.0.1
+requests>=2.32.0
+
+# --- LLM Orchestration & Multi-Agent Framework ---
+langchain>=0.3.0
+langchain-core>=0.3.0
+langchain-groq>=0.2.0
+langchain-google-genai>=2.0.0
+langchain-ollama>=0.2.0
+langchain-community>=0.3.0
+langgraph>=0.2.0
+groq>=0.11.0
+ollama>=0.3.0
+
+# --- Tools & Agent Capabilities ---
+tavily-python>=0.5.0
+yt-dlp>=2024.8.0
+psutil>=6.0.0
+
+# --- Audio Pipeline & Speech Recognition ---
+openwakeword>=0.6.0
+onnxruntime>=1.19.0
+faster-whisper>=0.10.0
+sounddevice>=0.5.0
+webrtcvad-wheels>=2.0.14
+PyAudio>=0.2.14
+numpy>=1.24.0,<2.0.0
+
+# --- Windows & System Automation ---
+pywin32>=306; sys_platform == 'win32'
