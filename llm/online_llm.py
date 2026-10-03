@@ -5,16 +5,18 @@ llm/online_llm.py — Online LLM Clients
 Provides ready-to-use LangChain chat model instances for:
   - Groq  (default: openai/gpt-oss-20b)
   - Google Gemini  (gemini-2.0-flash / gemini-2.5-pro)
+  - OpenRouter (default: liquid/lfm-2.5-2.6b:free)
 """
 
 from langchain_groq import ChatGroq
+from langchain_openrouter import ChatOpenRouter
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from config import GROQ, GEMINI
+from config import GROQ, GEMINI, OPENROUTER
 
 
 # ---------------------------------------------------------------------------
@@ -28,6 +30,21 @@ def get_groq(model: str | None = None, temperature: float = 0.7, **kwargs) -> Ch
     return ChatGroq(
         model=model or GROQ.DEFAULT_MODEL,
         api_key=GROQ.API_KEY,
+        temperature=temperature,
+        **kwargs,
+    )
+
+# ---------------------------------------------------------------------------
+# OpenRouter
+# ---------------------------------------------------------------------------
+
+def get_openrouter(model: str | None = None, temperature: float = 0.7, **kwargs) -> ChatOpenRouter:
+    """
+    Return a ChatOpenRouter instance.
+    """
+    return ChatOpenRouter(
+        model = model or OPENROUTER.DEFAULT_MODEL,
+        api_key=OPENROUTER.API_KEY,
         temperature=temperature,
         **kwargs,
     )
@@ -61,4 +78,5 @@ def get_gemini(
 
 
 groq_llm: ChatGroq | None = get_groq() if GROQ.API_KEY else None
+openrouter_llm: ChatOpenRouter | None = get_openrouter() if OPENROUTER.API_KEY else None
 gemini_llm: ChatGoogleGenerativeAI | None = get_gemini() if GEMINI.API_KEY else None
