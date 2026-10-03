@@ -99,30 +99,9 @@ The brain of Nova. Implemented as an asynchronous LangChain reasoning unit bound
 
 Provides seamless switching between cloud acceleration and local edge privacy.
 
-```
-                    ┌─────────────────────────┐
-                    │    User / System Turn   │
-                    └────────────┬────────────┘
-                                 │
-                     [Active Mode Selector]
-                                 │
-           ┌─────────────────────┴─────────────────────┐
-           ▼                                           ▼
-      [Hybrid Mode]                              [Offline Mode]
-           │                                           │
-  ┌────────┴────────┐                                  │
-  │ Try Groq Cloud  │                                  │
-  └────────┬────────┘                                  │
-     Success?                                          │
-    /        \                                         │
- (Yes)       (No / Timeout > 15s)                      │
-   │           │                                       │
-   │           └───────────────┐                       │
-   ▼                           ▼                       ▼
-Return Response      [Fallback to Ollama] ◄────────────┘
-                               │
-                        Return Response
-```
+<p align="center">
+  <img src="docs/Router%20Pipeline.png" alt="System Architecture" width="100%">
+</p>
 
 - **`RouterLLM`**: A custom `BaseChatModel` implementation supporting LangChain's `bind_tools` protocol.
 - **Timeout Protection**: Enforces an asynchronous 15-second hard deadline on cloud calls. If network packets stall or the provider errors, it automatically falls back to local Ollama (`lfm2.5`) without dropping the turn.
