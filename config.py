@@ -30,8 +30,14 @@ class GeminiConfig:
     PRO_MODEL: str = "gemini-2.5-pro"
     TIMEOUT_SECONDS: int = 12
 
+class OpenRouterConfig:
+    API_KEY: str = os.getenv("OPENROUTER_API_KEY")
+    DEFAULT_MODEL: str = 'liquid/lfm-2.5-2.6b:free'
+    FALLBACK_MODEL: str = 'nvidia/nemotron-3-super-120b-a12b:free'
+    TIMEOUT_SECONDS: int = 8
 
-# Which online provider to use as primary: "groq" | "gemini"
+
+# Which online provider to use as primary: "groq" | "gemini" | "openrouter"
 ONLINE_LLM_PROVIDER: str = "groq"
 
 # ---------------------------------------------------------------------------
@@ -138,6 +144,7 @@ class LogConfig:
 # ---------------------------------------------------------------------------
 
 GROQ = GroqConfig()
+OPENROUTER = OpenRouterConfig()
 GEMINI = GeminiConfig()
 OLLAMA = OllamaConfig()
 ROUTER = RouterConfig()
