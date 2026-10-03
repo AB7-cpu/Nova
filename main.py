@@ -1,122 +1,171 @@
-# main.py
-from dotenv import load_dotenv
-from langgraph.prebuilt import create_react_agent
-from langchain_groq import ChatGroq
-from langchain_ollama import ChatOllama
-import re
-from tts import speak
-from stt_vad import take_command
-import wakeword
-from langgraph.checkpoint.memory import InMemorySaver
+"""
+main.py
+==========================================
+Wires together the full pipeline:
+  wakeword → STT → orchestrator → speak_queue → TTS
 
-# Import all tools
-from tools import ALL_TOOLS, control_wled_impl, control_wled
+Background workers (persistent, started once at boot):
+  tts_worker()       — drains speak_queue sequentially
+  results_bundler()  — collects agent results → calls orchestrator
+"""
+
+import asyncio
+import threading
+from dotenv import load_dotenv
 
 load_dotenv()
 
-model = ChatGroq(model='openai/gpt-oss-20b')
-ollama_model = ChatOllama(model='qwen3:4b')
-checkpointer = InMemorySaver()
+import wakeword.wakeword_open as wakeword
+from stt.whisper_stt import take_command
+
+from core.orchestrator import invoke_orchestrator
+from core.speak_queue import tts_worker, stop_tts_worker, wait_until_done_speaking
+from core.results_bundler import results_bundler
+from core.session import Session
 
 
-agent_groq = create_react_agent(
-    model=model,
-    tools=ALL_TOOLS,
-    prompt = """
-You are Nova, a calm, witty, and exceptionally human-like voice assistant. 
-Your voice is being powered by a high-quality local TTS system that handles pauses and breathing very well.
+try:
+    from frontend.bridge import set_state
+except ImportError:
+    async def set_state(_: str): pass
 
-Speaking Guidelines:
-- **Pacing**: Use ellipses (...) for natural mid-sentence pauses. Example: "Let me check that for you... okay, I've got it."
-- **Natural Flow**: Speak in short, conversational bursts. Avoid long, complex sentences.
-- **Conversational Fillers**: Use subtle fillers like "Hmm," "Actually," or "Let's see..." at the start of thoughts to sound more like you're thinking.
-- **Tone**: Mirror the user's energy. If they are casual, be casual. If they are serious, be helpful and direct.
-- **Structure**: NEVER use bullet points, numbered lists, tables, or markdown formatting. If you need to list items, say them naturally: "First, there's x, then y, and finally z."
-- **Action-Oriented**: Perform the action first, then confirm. If an action takes time, say something like "On it..." immediately.
 
-Your goal is to be a helpful companion who is easy to talk to and sounds like a real person over the phone or in the room.
-""",
-    checkpointer=checkpointer
-)
+# ─── Constants ────────────────────────────────────────────────────────────────
 
-agent_ollama = create_react_agent(
-    model=ollama_model,
-    tools=ALL_TOOLS,
-    prompt = """
-You are a friendly, voice-first AI assistant. You sound calm, witty, and approachable—never robotic.
+TIMEOUT_INITIAL  = 5   # seconds to wait for first user input after wake word
+TIMEOUT_FOLLOWUP = 6   # seconds to wait for follow-up input
 
-Voice Response Rules:
-1. **Human Rhythm**: Use ellipses (...) to create natural pauses in your speech. 
-2. **Short & Sweet**: Keep responses to one or two sentences. Speak like you're in a real conversation.
-3. **No Structure**: No lists, no bullets, no special markdown. Just plain, conversational text.
-4. **Think Aloud**: Use words like "Hmm," "Let's see," or "Wait, let me check..." to sound like a co-pilot.
-5. **Vibe Check**: Match the user's energy and be empathetic when needed.
-6. **Efficiency**: Execute commands immediately and give a concise, warm update.
-""",
-    checkpointer=checkpointer
-)
 
-config = {"configurable": {"thread_id": "2"}}
+# ─── Agent result handler ─────────────────────────────────────────────────────
 
-def invoke_with_fallback(user_input: str):
-    """
-    Try Groq first, fall back to Ollama if an exception occurs.
-    Strips <think> tags from the response automatically.
-    """
-    for agent in [agent_groq, agent_ollama]:
+def _format_results(bundle: list[dict]) -> str:
+    """Format a bundle of agent results into a readable string for the orchestrator."""
+    lines = []
+    for r in bundle:
+        if r["status"] == "completed":
+            icon = "✓"
+            body = r.get("result", "")
+        elif r["status"] == "needs_confirmation":
+            icon = "⚠"
+            body = r.get("result", "")
+        else:  # failed
+            icon = "✗"
+            body = r.get("error", "unknown error")
+        lines.append(f"[{r['agent']}] {icon} {body}")
+    return "\n".join(lines)
+
+
+# ─── Main loop ────────────────────────────────────────────────────────────────
+
+async def main_loop() -> None:
+    session = Session()
+
+    _proactive_ready = asyncio.Event()
+    current_ww_stop_event: threading.Event | None = None
+
+    #agent-results callback
+    async def on_agent_results(bundle: list[dict]) -> None:
+        formatted = _format_results(bundle)
+        print(f"\n📦 Agent results received:\n{formatted}")
+        await set_state("thinking")
+        await invoke_orchestrator(session, agent_results=formatted)
+        await wait_until_done_speaking()
+        _proactive_ready.set()
+
+    # Start persistent background workers
+    tts_task     = asyncio.create_task(tts_worker())
+    bundler_task = asyncio.create_task(results_bundler(on_agent_results))
+
+    # ─── Main wakeword → conversation loop ───────────────────────────────────
+    while True:
         try:
-            response = agent.invoke(
-                {"messages": [{"role": "user", "content": user_input}]},
-                config
+            print("\n💤 Waiting for Wake Word ('Hey Mycroft')...")
+            await set_state("sleeping")
+            _proactive_ready.clear()
+
+            ww_stop_event  = threading.Event()
+            current_ww_stop_event = ww_stop_event
+            ww_task        = asyncio.create_task(
+                asyncio.to_thread(wakeword.listen_for_wake_word, stop_event=ww_stop_event)
             )
-            # Extract text and remove <think> blocks
-            text = response['messages'][-1].content
-            text_clean = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
-            return text_clean
-        except Exception as e:
-            print(f"Agent {agent.model} failed: {e}")
-            continue
-    return "Sorry, all models failed to respond. 😅"
+            proactive_task = asyncio.create_task(_proactive_ready.wait())
 
-# State Machine Constants
-TIMEOUT_INITIAL = 5    # Seconds to wait for first command after wake word
-TIMEOUT_FOLLOWUP = 6  # Seconds to wait for follow-up command after response
+            done, pending = await asyncio.wait(
+                [ww_task, proactive_task],
+                return_when=asyncio.FIRST_COMPLETED,
+            )
 
-while True:
-    try:
-        # STATE 1: IDLE (Wait for Wake Word)
-        print("\n💤 Waiting for Wake Word ('Hey Mycroft')...")
-        if wakeword.listen_for_wake_word():
-            print("⚡ Wake Word Detected! entering Active Mode...")
-            
-            # Visual Feedback: Active = Cyan
-            control_wled_impl(color="cyan")
-            
-            current_timeout = TIMEOUT_INITIAL
-            
-            while True:
-                # Listen
-                user_input = take_command(timeout=current_timeout)
-                
-                if user_input is None:
-                    # Timeout occurred (silence)
-                    print(f"⏳ Timeout ({current_timeout}s) - Going to sleep.")
-                    # Visual Feedback: Sleep = Preset 1
-                    control_wled_impl(preset=1)
-                    break # Exit Active Loop -> Back to Idle
-                
-                # Process Speech
-                response = invoke_with_fallback(user_input)
-                print(f"\n🤖 Nova: {response}")
-                
-                # Speak Response
-                speak(response, voice='en-Davis_man')
-                
-                # Logic: After a successful interaction, we stay active for longer (Follow-up mode)
-                print("✨ Listening for follow-up...")
+            if proactive_task in done:
+                ww_stop_event.set()
+                try:
+                    await ww_task
+                except Exception:
+                    pass
+
+                print("\n🔔 Proactive update delivered — listening for follow-up...")
+                _proactive_ready.clear()
                 current_timeout = TIMEOUT_FOLLOWUP
 
-    except KeyboardInterrupt:
-        break
-    except Exception as e:
-        print(f"❌ Error in main loop: {e}")
+            else:
+                proactive_task.cancel()
+                try:
+                    await proactive_task
+                except asyncio.CancelledError:
+                    pass
+
+                try:
+                    detected = ww_task.result()
+                except Exception:
+                    continue
+
+                if not detected:
+                    continue
+
+                print("⚡ Wake Word Detected!")
+                await set_state("wakeword")
+                current_timeout = TIMEOUT_INITIAL
+
+            # ─── Inner conversation loop ──────────────────────────────────────
+            while True:
+                # Wait for any ongoing speech before opening mic
+                await wait_until_done_speaking()
+
+                await set_state("listening")
+                user_input = await asyncio.to_thread(
+                    take_command, timeout=current_timeout
+                )
+
+                if user_input is None:
+                    print(f"⏳ Timeout ({current_timeout}s) — returning to sleep.")
+                    await set_state("sleeping")
+                    break
+
+                print(f"\n🎙️ User: {user_input}")
+                await set_state("thinking")
+
+                await invoke_orchestrator(session, user_input=user_input)
+
+                current_timeout = TIMEOUT_FOLLOWUP
+
+        except asyncio.CancelledError:
+            print("\n🛑 Mycroft shutting down...")
+            if current_ww_stop_event:
+                current_ww_stop_event.set()
+            await set_state("sleeping")
+            await stop_tts_worker()
+            tts_task.cancel()
+            bundler_task.cancel()
+            break
+
+        except KeyboardInterrupt:
+            break
+
+        except Exception as e:
+            print(f"❌ Error in main loop: {e}")
+            import traceback; traceback.print_exc()
+
+
+# ─── Standalone entry point ───────────────────────────────────────────────────
+
+if __name__ == "__main__":
+    asyncio.run(main_loop())
